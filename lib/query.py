@@ -10,6 +10,28 @@ from .version import __version__
 USER_AGENT = f'InfraSonarIntuneProbe/{__version__}'
 
 
+async def _get_data(resp: aiohttp.ClientResponse) -> dict[str, Any]:
+    try:
+        # check to unpack, no matter status
+        data = await resp.json()
+        error = data.get('error')
+        if error:
+            logging.error(data)
+            description = data.get('error_description') or 'no details'
+            raise CheckException(f'{error}: {description}')
+    except CheckException:
+        raise  # re-raise check exception
+    except Exception as e:
+        # other exception, try raise for status first
+        resp.raise_for_status()
+
+        # success, something else...
+        msg = str(e) or type(e).__name__
+        raise CheckException(f'request failed: {msg}')
+    else:
+        return data
+
+
 async def query_devices(asset_config: dict,
                         timeout: float | None = None) -> list[dict[str, Any]]:
     tenant_id = asset_config.get('tenantId')
@@ -46,13 +68,7 @@ async def query_devices(asset_config: dict,
                 headers=headers,
                 data=body,
                 ssl=True) as resp:
-            data = await resp.json()
-            error = data.get('error')
-            if error:
-                logging.error(data)
-                description = data.get('error_description') or 'no details'
-                raise CheckException(f'{error}: {description}')
-
+            data = await _get_data(resp)
             access_token = data['access_token']
 
     devices = []
@@ -63,12 +79,7 @@ async def query_devices(asset_config: dict,
                 timeout=aiohttp_timeout,
                 connector=get_connector(loop=loop)) as session:
             async with session.get(uri, headers=headers, ssl=True) as resp:
-                data = await resp.json()
-                error = data.get('error')
-                if error:
-                    logging.error(data)
-                    description = data.get('error_description') or 'no details'
-                    raise CheckException(f'{error}: {description}')
+                data = await _get_data(resp)
                 devices.extend(data['value'])
                 uri = data.get('@odata.nextLink')
 
