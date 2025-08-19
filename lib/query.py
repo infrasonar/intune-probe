@@ -47,8 +47,12 @@ async def query_devices(asset_config: dict,
                 data=body,
                 ssl=True) as resp:
             data = await resp.json()
-            logging.debug(data)
-            logging.debug(body)
+            error = data.get('error')
+            if error:
+                logging.error(data)
+                description = data.get('error_description') or 'no details'
+                raise CheckException(f'{error}: {description}')
+
             access_token = data['access_token']
 
     devices = []
@@ -60,6 +64,11 @@ async def query_devices(asset_config: dict,
                 connector=get_connector(loop=loop)) as session:
             async with session.get(uri, headers=headers, ssl=True) as resp:
                 data = await resp.json()
+                error = data.get('error')
+                if error:
+                    logging.error(data)
+                    description = data.get('error_description') or 'no details'
+                    raise CheckException(f'{error}: {description}')
                 devices.extend(data['value'])
                 uri = data.get('@odata.nextLink')
 
