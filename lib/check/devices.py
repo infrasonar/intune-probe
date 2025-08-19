@@ -1,3 +1,4 @@
+import re
 from datetime import datetime
 from libprobe.asset import Asset
 from libprobe.exceptions import CheckException
@@ -8,9 +9,9 @@ _NULLABLE = ('emailAddress', 'userPrincipalName', 'wiFiMacAddress')
 _MAX_ITEMS = 2000
 _MAX_DEVICE_BATCHES = 1
 _MAX_DEVICES = _MAX_ITEMS * _MAX_DEVICE_BATCHES
-_KEYS = set((
-    'DeviceName',  # str
-    'DeviceRegistrationState',  # str
+_METRICS = set((
+    'deviceName',  # str
+    'deviceRegistrationState',  # str
     'lastSyncDateTime',  # int
     'complianceState',  # str
     'id', 'name',  # str
@@ -29,6 +30,7 @@ _KEYS = set((
 
 
 def to_ts(time_str: str) -> int:
+    time_str = re.sub(r'(\.\d+)', '', time_str)
     time_str = time_str.replace('Z', '+00:00')
     dt = datetime.fromisoformat(time_str)
     return int(dt.timestamp())
@@ -41,7 +43,7 @@ async def check_devices(
     devices = await query_devices(asset_config)
 
     for device in devices:
-        to_remove = set(device.keys()) - _KEYS
+        to_remove = set(device.keys()) - _METRICS
         for key in to_remove:
             device.pop(key)
 
