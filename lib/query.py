@@ -32,11 +32,11 @@ async def _get_data(resp: aiohttp.ClientResponse) -> dict[str, Any]:
         return data
 
 
-async def query_devices(asset_config: dict,
+async def query_devices(local_config: dict,
                         timeout: float | None = None) -> list[dict[str, Any]]:
-    tenant_id = asset_config.get('tenantId')
-    client_id = asset_config.get('clientId')
-    client_secret = asset_config.get('secret')
+    tenant_id = local_config.get('tenantId')
+    client_id = local_config.get('clientId')
+    client_secret = local_config.get('secret')
 
     if not isinstance(tenant_id, str) or not tenant_id:
         raise CheckException('missing or invalid `tenantId` in asset config')

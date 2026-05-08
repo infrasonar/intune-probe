@@ -1,6 +1,7 @@
 import re
 from datetime import datetime
 from libprobe.asset import Asset
+from libprobe.check import Check
 from libprobe.exceptions import CheckException
 from ..query import query_devices
 
@@ -36,34 +37,37 @@ def to_ts(time_str: str) -> int:
     return int(dt.timestamp())
 
 
-async def check_devices(
-        asset: Asset,
-        asset_config: dict,
-        config: dict) -> dict:
-    devices = await query_devices(asset_config)
+class CheckDevices(Check):
+    key = 'devices'
+    unchanged_eol = 14400
 
-    for device in devices:
-        to_remove = set(device.keys()) - _METRICS
-        for key in to_remove:
-            device.pop(key)
+    @staticmethod
+    async def run(asset: Asset, local_config: dict, config: dict) -> dict:
 
-        for key in _NULLABLE:
-            if device[key] == "":
+        devices = await query_devices(local_config)
+
+        for device in devices:
+            to_remove = set(device.keys()) - _METRICS
+            for key in to_remove:
                 device.pop(key)
 
-        device['lastSyncDateTime'] = to_ts(device['lastSyncDateTime'])
-        device['name'] = device.pop('id')
+            for key in _NULLABLE:
+                if device[key] == "":
+                    device.pop(key)
 
-    if len(devices) > _MAX_DEVICES:
-        raise CheckException(
-            f'maximum number of devices ({_MAX_DEVICES}) reached, '
-            'please contact InfraSonar support')
+            device['lastSyncDateTime'] = to_ts(device['lastSyncDateTime'])
+            device['name'] = device.pop('id')
 
-    state = {}
-    index = 0
-    while index < _MAX_DEVICE_BATCHES:
-        start = index * _MAX_ITEMS
-        state[f'devices{index}'] = devices[start:start + _MAX_ITEMS]
-        index += 1
+        if len(devices) > _MAX_DEVICES:
+            raise CheckException(
+                f'maximum number of devices ({_MAX_DEVICES}) reached, '
+                'please contact InfraSonar support')
 
-    return state
+        state = {}
+        index = 0
+        while index < _MAX_DEVICE_BATCHES:
+            start = index * _MAX_ITEMS
+            state[f'devices{index}'] = devices[start:start + _MAX_ITEMS]
+            index += 1
+
+        return state
